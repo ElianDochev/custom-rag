@@ -77,8 +77,9 @@ def create_agents_and_tasks():
     return crew
 
 def retrieve_context(query: str, pdf_tool: DocumentSearchTool | None) -> str:
-    """Retrieve context directly from PDF tool first, then fall back to web search."""
+    """Retrieve context from PDF tool and web search (when a URL is provided)."""
     context_parts = []
+    has_url = "http://" in query or "https://" in query
 
     if pdf_tool is not None:
         try:
@@ -88,7 +89,7 @@ def retrieve_context(query: str, pdf_tool: DocumentSearchTool | None) -> str:
         if isinstance(pdf_result, str) and pdf_result.strip():
             context_parts.append(f"PDF context:\n{pdf_result}")
 
-    if not context_parts and FireCrawlWebSearchTool.is_enabled():
+    if (has_url or not context_parts) and FireCrawlWebSearchTool.is_enabled():
         web_result = FireCrawlWebSearchTool()._run(query)
         if isinstance(web_result, str) and web_result.strip():
             context_parts.append(f"Web context:\n{web_result}")

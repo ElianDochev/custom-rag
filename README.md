@@ -2,6 +2,10 @@
 # RAG Application with FireCrawl Web Search Fallback
 This repository contains a Retrieval-Augmented Generation (RAG) application that integrates a local Ollama model (`llama3.2:3b`) with FireCrawl for web search fallback. This setup allows the application to provide accurate and up-to-date information by leveraging both local knowledge and real-time web data.
 
+![Demo](static/demo.gif)
+
+The included [static/history_of_machine_learning.pdf](static/history_of_machine_learning.pdf) is a test PDF used for demo and validation.
+
 ## Installation and setup
 
 **Get API Keys**:
