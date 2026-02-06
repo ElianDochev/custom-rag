@@ -20,8 +20,8 @@ The included [static/history_of_machine_learning.pdf](static/history_of_machine_
 
    #### or use `conda`:
    ```bash
-   conda create -n agentic_rag python=3.11 -y
-   conda activate agentic_rag
+   conda create -n web_search_rag python=3.11 -y
+   conda activate web_search_rag
    ```
 
 **Install Dependencies**:
