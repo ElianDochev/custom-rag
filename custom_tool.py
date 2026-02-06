@@ -1,5 +1,7 @@
 import json
 import os
+import hashlib
+import uuid
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 from crewai.tools import BaseTool
@@ -8,6 +10,12 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator
 from markitdown import MarkItDown
 from chonkie import SemanticChunker
 from qdrant_client import QdrantClient
+
+class DocumentSearchResult(BaseModel):
+    """Structured result for document search operations."""
+    ok: bool
+    text: str = ""
+    error: str | None = None
 
 class DocumentSearchToolInput(BaseModel):
     """Input schema for DocumentSearchTool."""
@@ -82,8 +90,22 @@ class DocumentSearchTool(BaseTool):
         self._has_chunks = True
         
         docs = [chunk.text for chunk in chunks]
-        metadata = [{"source": os.path.basename(self.file_path)} for _ in range(len(chunks))]
-        ids = list(range(len(chunks)))
+        # Stable, namespaced document id based on path + content fingerprint
+        base_name = os.path.basename(self.file_path)
+        doc_fingerprint = hashlib.sha1(
+            f"{os.path.abspath(self.file_path)}|{raw_text[:1024]}".encode("utf-8")
+        ).hexdigest()
+        doc_id = f"{base_name}-{doc_fingerprint[:8]}"
+
+        # Include richer metadata and unique UUID ids per chunk
+        metadata = [
+            {"source": base_name, "doc_id": doc_id, "chunk_index": i}
+            for i in range(len(chunks))
+        ]
+        ids = [
+            uuid.uuid5(uuid.NAMESPACE_URL, f"{doc_id}-{i}")
+            for i in range(len(chunks))
+        ]
 
         self.client.add(
             collection_name="demo_collection",
@@ -92,17 +114,27 @@ class DocumentSearchTool(BaseTool):
             ids=ids
         )
 
-    def _run(self, query: str) -> list:
-        """Search the document with a query string."""
+    def _run(self, query: str) -> DocumentSearchResult:
+        """Search the document and return a structured result."""
         if not self._has_chunks:
-            return "No searchable text was extracted from the PDF. Ensure the PDF contains selectable text or run OCR."
+            return DocumentSearchResult(
+                ok=False,
+                text="",
+                error=(
+                    "No searchable text was extracted from the PDF. "
+                    "Ensure the PDF contains selectable text or run OCR."
+                ),
+            )
         relevant_chunks = self.client.query(
             collection_name="demo_collection",
             query_text=query
         )
         docs = [chunk.document for chunk in relevant_chunks]
         separator = "\n___\n"
-        return separator.join(docs)
+        joined = separator.join(docs).strip()
+        if joined:
+            return DocumentSearchResult(ok=True, text=joined)
+        return DocumentSearchResult(ok=False, text="", error="No matching chunks found.")
 
 
 class FireCrawlWebSearchTool(BaseTool):
@@ -169,17 +201,20 @@ class FireCrawlWebSearchTool(BaseTool):
 def test_document_searcher():
     # Test file path
     pdf_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-        "knowledge",
-        "dspy.pdf"
+        os.path.dirname(__file__),
+        "static",
+        "history_of_machine_learning.pdf"
     )
-    
+
     # Create instance
     searcher = DocumentSearchTool(file_path=pdf_path)
-    
+
     # Test search
-    result = searcher._run("What is the purpose of DSpy?")
-    print("Search Results:", result)
+    result = searcher._run("Who was a prominent pioneer in machine learning?")
+    if result.ok:
+        print("Search Results:", result.text)
+    else:
+        print("PDF Search Error:", result.error)
 
 if __name__ == "__main__":
     test_document_searcher()

@@ -11,7 +11,8 @@ dependencies = [
     "markitdown",
     "qdrant-client",
     "fastembed",
-    "pydantic"
+    "pydantic",
+    "python-dotenv"
 ]
 
 [project.scripts]
